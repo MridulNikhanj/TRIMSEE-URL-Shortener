@@ -1,37 +1,28 @@
-version: '3'
-services:
-  mongo:
-    image: mongo
-    container_name: mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
+version: '3.9'
 
+services:
   backend:
-    build: ./server
-    container_name: backend
+    build:
+      context: ./server
+      dockerfile: Dockerfile
     ports:
       - "3200:3200"
-    depends_on:
-      - mongo
-    environment:
-      - DB_URI=mongodb://mongo:27017/urlshortener
-      - BASE=http://localhost:3200
-    restart: always
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server:/app
+      - /app/node_modules
 
   frontend:
-    build: ./client
-    container_name: frontend
+    build:
+      context: ./client
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - ./client/.env
+    volumes:
+      - ./client:/app
+      - /app/node_modules
     depends_on:
       - backend
-    environment:
-      - REACT_APP_BASE_URL=http://localhost:3200
-    stdin_open: true
-    tty: true
-    restart: always
-
-volumes:
-  mongo-data:
