@@ -3,8 +3,14 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                checkout scm  // Ensures the repo is checked out first
-                sh 'ls -al'  // Lists files to confirm the repo is cloned correctly
+                script {
+                    // Explicitly clone the repository if it's not already cloned
+                    if (!fileExists('.git')) {
+                        git credentialsId: 'github-creds', url: 'https://github.com/MridulNikhanj/TRIMSEE-URL-Shortener.git', branch: 'main'
+                    } else {
+                        echo 'Repository already checked out.'
+                    }
+                }
             }
         }
         stage('Build Docker Images') {
