@@ -3,7 +3,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git credentialsId: 'github-creds', url: 'https://github.com/MridulNikhanj/TRIMSEE-URL-Shortener.git', branch: 'main'
+                checkout scm
             }
         }
         stage('Build Docker Images') {
@@ -18,7 +18,6 @@ pipeline {
         }
         stage('Verify App') {
             steps {
-                // Wait for the application to start
                 sh "sleep 20"
                 sh 'curl -f http://localhost:3000 || exit 1'
             }
@@ -37,7 +36,6 @@ pipeline {
             echo 'CI/CD Pipeline executed successfully!'
         }
         always {
-            // Clean up any stray containers
             sh 'docker ps -a | grep -i trimsee || true'
             sh 'docker ps -a | grep -i trimsee | awk \'{print $1}\' | xargs docker stop || true'
             sh 'docker ps -a | grep -i trimsee | awk \'{print $1}\' | xargs docker rm || true'
