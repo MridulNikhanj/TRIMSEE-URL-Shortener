@@ -13,9 +13,16 @@ services:
     working_dir: /app
     volumes:
       - ./server:/app
-      # - /app/node_modules
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3200"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - trimsee-network
+    restart: unless-stopped
 
   frontend:
     container_name: trimsee-frontend
@@ -29,11 +36,19 @@ services:
     working_dir: /app
     volumes:
       - ./client:/app
-      # - /app/node_modules
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - trimsee-network
+    restart: unless-stopped
 
 networks:
   trimsee-network:

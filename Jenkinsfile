@@ -14,18 +14,44 @@ pipeline {
         stage('Run Containers') {
             steps {
                 sh 'docker-compose -f docker-compose.yml up -d'
+                sh 'sleep 10'
+                sh '''
+                echo "Checking container statuses..."
+                docker ps -a
+                docker logs trimsee-backend
+                docker logs trimsee-frontend
+                '''
             }
         }
         stage('Verify App') {
             steps {
-                sh "sleep 30"
                 sh '''
+                echo "Waiting for containers to be ready..."
+                sleep 30
+                
                 echo "Checking container statuses..."
-                docker ps | grep trimsee-frontend || exit 1
-                docker ps | grep trimsee-backend || exit 1
+                if ! docker ps | grep -q trimsee-frontend; then
+                    echo "Frontend container is not running"
+                    docker logs trimsee-frontend
+                    exit 1
+                fi
+                
+                if ! docker ps | grep -q trimsee-backend; then
+                    echo "Backend container is not running"
+                    docker logs trimsee-backend
+                    exit 1
+                fi
 
-                echo "Testing application endpoint..."
-                curl -f http://localhost:3000 || exit 1
+                echo "Testing application endpoints..."
+                if ! curl -f http://localhost:3000; then
+                    echo "Frontend is not accessible"
+                    exit 1
+                fi
+                
+                if ! curl -f http://localhost:3200; then
+                    echo "Backend is not accessible"
+                    exit 1
+                fi
                 '''
             }
         }
@@ -38,6 +64,11 @@ pipeline {
     post {
         failure {
             echo 'Build failed!'
+            sh '''
+            echo "Container logs:"
+            docker logs trimsee-frontend || true
+            docker logs trimsee-backend || true
+            '''
         }
         success {
             echo 'CI/CD Pipeline executed successfully!'
