@@ -1,5 +1,4 @@
-version: '3.9'
-
+# Remove the version directive as it's now obsolete
 services:
   backend:
     build:
@@ -12,6 +11,8 @@ services:
     volumes:
       - ./server:/app
       - /app/node_modules
+    networks:
+      - trimsee-network
 
   frontend:
     build:
@@ -26,3 +27,9 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - trimsee-network
+
+networks:
+  trimsee-network:
+    driver: bridge
