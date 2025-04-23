@@ -20,8 +20,11 @@ pipeline {
             steps {
                 sh "sleep 30"
                 sh '''
-                docker ps | grep frontend || exit 1
-                docker ps | grep backend || exit 1
+                echo "Checking container statuses..."
+                docker ps | grep trimsee-frontend || exit 1
+                docker ps | grep trimsee-backend || exit 1
+
+                echo "Testing application endpoint..."
                 curl -f http://localhost:3000 || exit 1
                 '''
             }
@@ -41,7 +44,7 @@ pipeline {
         }
         always {
             sh '''
-            docker ps -a | grep -i trimsee || true
+            echo "Stopping and removing leftover containers..."
             docker ps -a | grep -i trimsee | awk '{print $1}' | xargs docker stop || true
             docker ps -a | grep -i trimsee | awk '{print $1}' | xargs docker rm || true
             '''
