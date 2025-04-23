@@ -25,11 +25,14 @@ pipeline {
         }
         stage('Verify App') {
             steps {
-                sh "sleep 20"  // Wait for the app to start
-                // Use the container name instead of localhost
+                sh "sleep 30"  // Wait longer for the app to start (30 seconds)
                 sh '''
-                FRONTEND_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' trimsee-url-pipeline-frontend-1 || docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' trimsee-url-pipeline_frontend_1)
-                curl -f http://$FRONTEND_IP:3000 || exit 1
+                # Check if containers are still running
+                docker ps | grep frontend
+                docker ps | grep backend
+                
+                # Try to access the app through Docker host network
+                docker run --rm --network=host curlimages/curl:latest curl -f http://localhost:3000 || exit 1
                 '''
             }
         }
