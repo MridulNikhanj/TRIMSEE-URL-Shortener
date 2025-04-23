@@ -8,15 +8,15 @@ pipeline {
         }
         stage('Build Docker Images') {
             steps {
-                sh 'docker-compose -f docker-compose.yml build'
+                bat 'docker-compose -f docker-compose.yml build'
             }
         }
         stage('Run Containers') {
             steps {
-                sh 'docker-compose -f docker-compose.yml up -d'
-                sh 'sleep 10'
-                sh '''
-                echo "Checking container statuses..."
+                bat 'docker-compose -f docker-compose.yml up -d'
+                bat 'timeout /t 10'
+                bat '''
+                echo Checking container statuses...
                 docker ps -a
                 docker logs trimsee-backend
                 docker logs trimsee-frontend
@@ -25,59 +25,65 @@ pipeline {
         }
         stage('Verify App') {
             steps {
-                sh '''
-                echo "Waiting for containers to be ready..."
-                sleep 30
+                bat '''
+                echo Waiting for containers to be ready...
+                timeout /t 30
                 
-                echo "Checking container statuses..."
-                if ! docker ps | grep -q trimsee-frontend; then
-                    echo "Frontend container is not running"
+                echo Checking container statuses...
+                docker ps | findstr trimsee-frontend
+                if errorlevel 1 (
+                    echo Frontend container is not running
                     docker logs trimsee-frontend
-                    exit 1
-                fi
+                    exit /b 1
+                )
                 
-                if ! docker ps | grep -q trimsee-backend; then
-                    echo "Backend container is not running"
+                docker ps | findstr trimsee-backend
+                if errorlevel 1 (
+                    echo Backend container is not running
                     docker logs trimsee-backend
-                    exit 1
-                fi
+                    exit /b 1
+                )
 
-                echo "Testing application endpoints..."
-                if ! curl -f http://localhost:3000; then
-                    echo "Frontend is not accessible"
-                    exit 1
-                fi
+                echo Testing application endpoints...
+                curl -f http://localhost:3000
+                if errorlevel 1 (
+                    echo Frontend is not accessible
+                    exit /b 1
+                )
                 
-                if ! curl -f http://localhost:3200; then
-                    echo "Backend is not accessible"
-                    exit 1
-                fi
+                curl -f http://localhost:3200
+                if errorlevel 1 (
+                    echo Backend is not accessible
+                    exit /b 1
+                )
                 '''
             }
         }
         stage('Clean Up') {
             steps {
-                sh 'docker-compose -f docker-compose.yml down'
+                bat 'docker-compose -f docker-compose.yml down'
             }
         }
     }
     post {
         failure {
             echo 'Build failed!'
-            sh '''
-            echo "Container logs:"
-            docker logs trimsee-frontend || true
-            docker logs trimsee-backend || true
+            bat '''
+            echo Container logs:
+            docker logs trimsee-frontend
+            docker logs trimsee-backend
             '''
         }
         success {
             echo 'CI/CD Pipeline executed successfully!'
         }
         always {
-            sh '''
-            echo "Stopping and removing leftover containers..."
-            docker ps -a | grep -i trimsee | awk '{print $1}' | xargs docker stop || true
-            docker ps -a | grep -i trimsee | awk '{print $1}' | xargs docker rm || true
+            bat '''
+            echo Stopping and removing leftover containers...
+            for /f "tokens=1" %%i in ('docker ps -a ^| findstr /i trimsee') do (
+                docker stop %%i
+                docker rm %%i
+            )
             '''
         }
     }
