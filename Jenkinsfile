@@ -17,51 +17,74 @@ pipeline {
         
         stage('Environment Setup') {
             steps {
-                bat '''
+                sh '''
                 echo Checking Docker and Docker Compose installation...
                 docker --version
                 docker-compose --version
                 
                 echo Cleaning up existing containers...
-                docker-compose -f %DOCKER_COMPOSE_FILE% down --remove-orphans
+                docker-compose -f $DOCKER_COMPOSE_FILE down --remove-orphans || true
                 '''
             }
         }
         
         stage('Build Docker Images') {
             steps {
-                bat 'docker-compose -f %DOCKER_COMPOSE_FILE% build --no-cache'
+                sh 'docker-compose -f $DOCKER_COMPOSE_FILE build --no-cache'
             }
         }
         
         stage('Run Containers') {
             steps {
-                bat 'docker-compose -f %DOCKER_COMPOSE_FILE% up -d'
-                bat 'timeout /t 20'
-                bat '''
+                sh 'docker-compose -f $DOCKER_COMPOSE_FILE up -d'
+                sh 'sleep 20'
+                sh '''
                 echo Checking container statuses...
                 docker ps -a
                 echo Backend Logs:
-                docker logs trimsee-backend
+                docker logs trimsee-backend || true
                 echo Frontend Logs:
-                docker logs trimsee-frontend
+                docker logs trimsee-frontend || true
                 '''
             }
         }
         
         stage('Health Check') {
             steps {
-                bat '''
+                sh '''
                 echo Waiting for services to be ready...
-                timeout /t 30
+                sleep 30
                 
                 echo Checking container health...
-                docker ps | findstr trimsee-frontend || (echo Frontend container failed & exit /b 1)
-                docker ps | findstr trimsee-backend || (echo Backend container failed & exit /b 1)
+                docker ps | grep trimsee-frontend || (echo Frontend container failed && exit 1)
+                docker ps | grep trimsee-backend || (echo Backend container failed && exit 1)
                 
                 echo Testing endpoints...
-                curl -f -s http://localhost:%FRONTEND_PORT% > nul || (echo Frontend health check failed & exit /b 1)
-                curl -f -s http://localhost:%BACKEND_PORT% > nul || (echo Backend health check failed & exit /b 1)
+                attempt_counter=0
+                max_attempts=5
+                until $(curl --output /dev/null --silent --head --fail http://localhost:$FRONTEND_PORT); do
+                    if [ ${attempt_counter} -eq ${max_attempts} ];then
+                      echo "Frontend health check failed after $max_attempts attempts."
+                      exit 1
+                    fi
+                    printf '.'
+                    attempt_counter=$(($attempt_counter+1))
+                    sleep 5
+                done
+                echo "Frontend OK."
+
+                attempt_counter=0
+                until $(curl --output /dev/null --silent --head --fail http://localhost:$BACKEND_PORT); do
+                    if [ ${attempt_counter} -eq ${max_attempts} ];then
+                      echo "Backend health check failed after $max_attempts attempts."
+                      exit 1
+                    fi
+                    printf '.'
+                    attempt_counter=$(($attempt_counter+1))
+                    sleep 5
+                done
+                echo "Backend OK."
+                
                 echo All health checks passed!
                 '''
             }
@@ -69,13 +92,14 @@ pipeline {
         
         stage('Integration Tests') {
             steps {
-                bat '''
+                sh '''
                 echo Running integration tests...
-                curl -X POST -H "Content-Type: application/json" -d "{\"longUrl\":\"https://www.example.com\"}" http://localhost:%BACKEND_PORT%/api/url/shorten
-                if errorlevel 1 (
+                sleep 5 
+                curl -X POST -H "Content-Type: application/json" -d '{"longUrl":"https://www.example.com"}' http://localhost:$BACKEND_PORT/api/url/shorten
+                if [ $? -ne 0 ]; then
                     echo URL shortening test failed
-                    exit /b 1
-                )
+                    exit 1
+                fi
                 echo Integration tests passed!
                 '''
             }
@@ -83,9 +107,9 @@ pipeline {
         
         stage('Clean Up') {
             steps {
-                bat '''
+                sh '''
                 echo Cleaning up resources...
-                docker-compose -f %DOCKER_COMPOSE_FILE% down --remove-orphans
+                docker-compose -f $DOCKER_COMPOSE_FILE down --remove-orphans || true
                 '''
             }
         }
@@ -93,28 +117,26 @@ pipeline {
     
     post {
         success {
-            bat '''
+            sh '''
             echo Pipeline executed successfully!
             echo Deployment Status: SUCCESS
             '''
         }
         failure {
-            bat '''
+            sh '''
             echo Build or deployment failed!
             echo Container logs:
-            docker logs trimsee-frontend
-            docker logs trimsee-backend
+            docker logs trimsee-frontend || echo "Frontend logs unavailable."
+            docker logs trimsee-backend || echo "Backend logs unavailable."
             echo Deployment Status: FAILED
             '''
         }
         always {
-            bat '''
-            echo Cleaning up resources...
-            docker-compose -f %DOCKER_COMPOSE_FILE% down --remove-orphans
-            for /f "tokens=1" %%i in ('docker ps -a ^| findstr /i trimsee') do (
-                docker stop %%i
-                docker rm %%i
-            )
+            sh '''
+            echo Cleaning up resources in always block...
+            docker-compose -f $DOCKER_COMPOSE_FILE down --remove-orphans || true
+            docker ps -a -q --filter "name=trimsee" | xargs -r docker stop || true
+            docker ps -a -q --filter "name=trimsee" | xargs -r docker rm || true
             '''
         }
     }
