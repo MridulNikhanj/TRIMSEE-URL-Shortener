@@ -14,18 +14,9 @@ services:
     volumes:
       - ./server:/app
       - /app/node_modules
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
       - trimsee-network
     restart: unless-stopped
-    environment:
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
 
   frontend:
     container_name: trimsee-frontend
@@ -40,22 +31,11 @@ services:
     volumes:
       - ./client:/app
       - /app/node_modules
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - trimsee-network
     restart: unless-stopped
-    environment:
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
 
 networks:
   trimsee-network:
