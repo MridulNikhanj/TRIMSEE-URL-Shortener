@@ -25,15 +25,11 @@ pipeline {
                 docker-compose --version
                 
                 echo "Cleaning up existing containers..."
-                # Stop and remove all containers from previous runs
                 docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans --volumes || true
-                docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
+                docker rm -f trimsee-backend trimsee-frontend || true
                 
                 # Clean up any dangling resources
                 docker system prune -f || true
-                
-                # Remove any existing volumes
-                docker volume rm trimsee-pipeline_mongodb_data || true
                 '''
             }
         }
@@ -51,28 +47,10 @@ pipeline {
             steps {
                 sh '''
                 echo "Ensuring no conflicting containers exist..."
-                docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
+                docker rm -f trimsee-backend trimsee-frontend || true
                 
                 echo "Starting containers..."
                 docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
-                
-                echo "Waiting for MongoDB to be healthy..."
-                for i in $(seq 1 12); do
-                    echo "MongoDB health check attempt $i/12"
-                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-mongodb.*healthy"; then
-                        echo "MongoDB is healthy"
-                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs mongodb
-                        break
-                    fi
-                    if [ $i -eq 12 ]; then
-                        echo "MongoDB failed to become healthy"
-                        echo "MongoDB Logs:"
-                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs mongodb
-                        exit 1
-                    fi
-                    echo "Waiting for MongoDB... (attempt $i/12)"
-                    sleep 10
-                done
                 
                 echo "Waiting for backend to be healthy..."
                 for i in $(seq 1 12); do
@@ -152,8 +130,7 @@ pipeline {
             sh '''
             echo "Cleaning up resources..."
             docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans --volumes || true
-            docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
-            docker volume rm trimsee-pipeline_mongodb_data || true
+            docker rm -f trimsee-backend trimsee-frontend || true
             '''
         }
     }
