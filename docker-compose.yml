@@ -12,13 +12,19 @@ services:
       - PORT=3200
       - DB_URI=mongodb+srv://nikhanjmridul:XcRsInwe9rfoVAtm@cluster0.o59qiro.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - BASE=http://localhost:3200
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DEBUG=express:*,mongodb:*
-      - NODE_OPTIONS=--trace-warnings
+      - NODE_OPTIONS=--max-old-space-size=4096
     working_dir: /app
     networks:
       - trimsee-network
-    restart: unless-stopped
+    restart: always
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   frontend:
     container_name: trimsee-frontend
@@ -30,12 +36,14 @@ services:
     environment:
       - PORT=3000
       - REACT_APP_BASE_URL=http://localhost:3200
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=4096
     working_dir: /app
     depends_on:
       - backend
     networks:
       - trimsee-network
-    restart: unless-stopped
+    restart: always
 
 networks:
   trimsee-network:
