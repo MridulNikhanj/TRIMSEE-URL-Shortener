@@ -18,29 +18,29 @@ pipeline {
         
         stage('Environment Setup') {
             steps {
-                bat '''
-                echo Checking Docker and Docker Compose installation...
+                sh '''
+                echo "Checking Docker and Docker Compose installation..."
                 docker --version
                 docker-compose --version
                 
-                echo Cleaning up existing containers...
-                docker-compose -f %DOCKER_COMPOSE_FILE% down --remove-orphans || exit 0
+                echo "Cleaning up existing containers..."
+                docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans || true
                 '''
             }
         }
         
         stage('Build Docker Images') {
             steps {
-                bat 'docker-compose -f %DOCKER_COMPOSE_FILE% build --no-cache'
+                sh 'docker-compose -f ${DOCKER_COMPOSE_FILE} build --no-cache'
             }
         }
         
         stage('Run Containers') {
             steps {
-                bat '''
-                docker-compose -f %DOCKER_COMPOSE_FILE% up -d
-                timeout /t 20 /nobreak
-                echo Checking container statuses...
+                sh '''
+                docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
+                sleep 20
+                echo "Checking container statuses..."
                 docker ps -a
                 '''
             }
@@ -48,33 +48,33 @@ pipeline {
         
         stage('Health Check') {
             steps {
-                bat '''
-                echo Waiting for services to be ready...
-                timeout /t 30 /nobreak
+                sh '''
+                echo "Waiting for services to be ready..."
+                sleep 30
                 
-                echo Checking container health...
-                docker ps | findstr "trimsee-frontend" || (echo Frontend container failed && exit 1)
-                docker ps | findstr "trimsee-backend" || (echo Backend container failed && exit 1)
-                docker ps | findstr "trimsee-mongodb" || (echo MongoDB container failed && exit 1)
+                echo "Checking container health..."
+                docker ps | grep trimsee-frontend || (echo "Frontend container failed" && exit 1)
+                docker ps | grep trimsee-backend || (echo "Backend container failed" && exit 1)
+                docker ps | grep trimsee-mongodb || (echo "MongoDB container failed" && exit 1)
                 
-                echo Testing backend health...
-                curl -X GET http://localhost:%BACKEND_PORT%/health || (echo Backend health check failed && exit 1)
+                echo "Testing backend health..."
+                curl -X GET http://localhost:${BACKEND_PORT}/health || (echo "Backend health check failed" && exit 1)
                 
-                echo All health checks passed!
+                echo "All health checks passed!"
                 '''
             }
         }
         
         stage('Integration Tests') {
             steps {
-                bat '''
-                echo Running integration tests...
-                timeout /t 5 /nobreak
+                sh '''
+                echo "Running integration tests..."
+                sleep 5
                 
-                echo Testing URL shortening endpoint...
-                curl -X POST -H "Content-Type: application/json" -d "{\"longUrl\":\"https://www.example.com\"}" http://localhost:%BACKEND_PORT%/api/url/shorten || (echo URL shortening test failed && exit 1)
+                echo "Testing URL shortening endpoint..."
+                curl -X POST -H "Content-Type: application/json" -d '{"longUrl":"https://www.example.com"}' http://localhost:${BACKEND_PORT}/api/url/shorten || (echo "URL shortening test failed" && exit 1)
                 
-                echo Integration tests passed!
+                echo "Integration tests passed!"
                 '''
             }
         }
@@ -82,21 +82,21 @@ pipeline {
     
     post {
         success {
-            bat 'echo Pipeline executed successfully!'
+            sh 'echo "Pipeline executed successfully!"'
         }
         failure {
-            bat '''
-            echo Build or deployment failed!
-            echo Container logs:
-            docker logs trimsee-frontend
-            docker logs trimsee-backend
-            docker logs trimsee-mongodb
+            sh '''
+            echo "Build or deployment failed!"
+            echo "Container logs:"
+            docker logs trimsee-frontend || true
+            docker logs trimsee-backend || true
+            docker logs trimsee-mongodb || true
             '''
         }
         always {
-            bat '''
-            echo Cleaning up resources...
-            docker-compose -f %DOCKER_COMPOSE_FILE% down --remove-orphans || exit 0
+            sh '''
+            echo "Cleaning up resources..."
+            docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans || true
             '''
         }
     }
