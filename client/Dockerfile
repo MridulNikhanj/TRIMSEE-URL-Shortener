@@ -10,23 +10,25 @@ RUN apt-get update && \
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with clean npm cache
+RUN npm cache clean --force && \
+    npm install && \
+    npm cache clean --force
 
 # Copy application files
 COPY . .
 
-# Configure Node.js for production
+# Configure Node.js for production with increased memory
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=8192 --max-semi-space-size=512 --optimize-for-size"
 
-# Build the application
+# Build the application with increased memory allocation
 RUN npm run build
 
-# Install serve to run the built application
-RUN npm install -g serve
+# Install PM2 globally for better process management
+RUN npm install -g pm2 serve
 
 EXPOSE 3000
 
-# Use serve instead of development server
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Use PM2 to manage the serve process
+CMD ["pm2-runtime", "start", "serve", "--", "-s", "build", "-l", "3000", "--no-clipboard", "--single"]

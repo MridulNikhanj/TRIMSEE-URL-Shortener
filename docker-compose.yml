@@ -14,17 +14,21 @@ services:
       - BASE=http://localhost:3200
       - NODE_ENV=production
       - DEBUG=express:*,mongodb:*
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=8192
     working_dir: /app
     networks:
       - trimsee-network
     restart: always
+    oom_kill_disable: true
+    mem_swappiness: 60
+    memswap_limit: -1
+    mem_reservation: 512M
     healthcheck:
       test: ["CMD", "/healthcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      interval: 45s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
 
   frontend:
     container_name: trimsee-frontend
@@ -37,13 +41,17 @@ services:
       - PORT=3000
       - REACT_APP_BASE_URL=http://localhost:3200
       - NODE_ENV=production
-      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_OPTIONS=--max-old-space-size=8192
     working_dir: /app
     depends_on:
       - backend
     networks:
       - trimsee-network
     restart: always
+    oom_kill_disable: true
+    mem_swappiness: 60
+    memswap_limit: -1
+    mem_reservation: 512M
 
 networks:
   trimsee-network:
