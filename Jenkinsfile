@@ -58,12 +58,15 @@ pipeline {
                 
                 echo "Waiting for MongoDB to be healthy..."
                 for i in $(seq 1 12); do
+                    echo "MongoDB health check attempt $i/12"
                     if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-mongodb.*healthy"; then
                         echo "MongoDB is healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs mongodb
                         break
                     fi
                     if [ $i -eq 12 ]; then
                         echo "MongoDB failed to become healthy"
+                        echo "MongoDB Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs mongodb
                         exit 1
                     fi
@@ -73,31 +76,41 @@ pipeline {
                 
                 echo "Waiting for backend to be healthy..."
                 for i in $(seq 1 12); do
+                    echo "Backend health check attempt $i/12"
                     if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-backend.*healthy"; then
                         echo "Backend is healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs backend
                         break
                     fi
                     if [ $i -eq 12 ]; then
                         echo "Backend failed to become healthy"
+                        echo "Backend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs backend
+                        echo "Backend Health Check Response:"
+                        curl -v http://localhost:${BACKEND_PORT}/health || true
                         exit 1
                     fi
                     echo "Waiting for backend... (attempt $i/12)"
+                    docker-compose -f ${DOCKER_COMPOSE_FILE} logs --tail=50 backend
                     sleep 10
                 done
                 
                 echo "Waiting for frontend to be healthy..."
                 for i in $(seq 1 12); do
+                    echo "Frontend health check attempt $i/12"
                     if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-frontend.*healthy"; then
                         echo "Frontend is healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs frontend
                         break
                     fi
                     if [ $i -eq 12 ]; then
                         echo "Frontend failed to become healthy"
+                        echo "Frontend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs frontend
                         exit 1
                     fi
                     echo "Waiting for frontend... (attempt $i/12)"
+                    docker-compose -f ${DOCKER_COMPOSE_FILE} logs --tail=50 frontend
                     sleep 10
                 done
                 
@@ -114,7 +127,7 @@ pipeline {
                 sleep 5
                 
                 echo "Testing URL shortening endpoint..."
-                curl -X POST -H "Content-Type: application/json" -d '{"longUrl":"https://www.example.com"}' http://localhost:${BACKEND_PORT}/api/url/shorten || (echo "URL shortening test failed" && exit 1)
+                curl -v -X POST -H "Content-Type: application/json" -d '{"longUrl":"https://www.example.com"}' http://localhost:${BACKEND_PORT}/api/url/shorten || (echo "URL shortening test failed" && exit 1)
                 
                 echo "Integration tests passed!"
                 '''
@@ -131,6 +144,8 @@ pipeline {
             echo "Build or deployment failed!"
             echo "Container logs:"
             docker-compose -f ${DOCKER_COMPOSE_FILE} logs || true
+            echo "Container status:"
+            docker-compose -f ${DOCKER_COMPOSE_FILE} ps || true
             '''
         }
         always {

@@ -13,9 +13,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 20s
+      timeout: 10s
+      retries: 3
       start_period: 40s
 
   backend:
@@ -27,10 +27,10 @@ services:
       - "3200:3200"
     environment:
       - PORT=3200
-      - DB_URI=${DB_URI:-mongodb://mongodb:27017/trimsee}
+      - DB_URI=mongodb://mongodb:27017/trimsee
       - BASE=http://localhost:3200
       - NODE_ENV=development
-      - DEBUG=express:*
+      - DEBUG=express:*,mongodb:*
     working_dir: /app
     volumes:
       - ./server:/app
@@ -42,10 +42,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3200/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "curl -f http://localhost:3200/health || (echo 'Health check failed' && exit 1)"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
       start_period: 60s
 
   frontend:
@@ -69,10 +69,10 @@ services:
       - trimsee-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "curl -f http://localhost:3000 || (echo 'Health check failed' && exit 1)"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
       start_period: 40s
 
 networks:
