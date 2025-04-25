@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  mongodb:
+    image: mongo:latest
+    container_name: trimsee-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - trimsee-network
+    restart: unless-stopped
+
   backend:
     container_name: trimsee-backend
     build:
@@ -10,12 +21,16 @@ services:
       - "3200:3200"
     env_file:
       - ./server/.env
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/trimsee
     working_dir: /app
     volumes:
       - ./server:/app
       - /app/node_modules
     networks:
       - trimsee-network
+    depends_on:
+      - mongodb
     restart: unless-stopped
 
   frontend:
@@ -40,3 +55,6 @@ services:
 networks:
   trimsee-network:
     driver: bridge
+
+volumes:
+  mongodb_data:
