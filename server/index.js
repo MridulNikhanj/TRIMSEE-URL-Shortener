@@ -3,17 +3,21 @@ const app = express();
 const cors = require('cors');
 const path = require('path');
 require("dotenv").config({ path: path.resolve(__dirname, '.env') });
-
-const port = process.env.PORT || 3200;
-const base = process.env.BASE || 'http://localhost:3200';
 const connectDatabase = require('./config/dbConnection');
 const urlShortnerRouter = require('./Routes/urlRoutes');
 const useragent = require('express-useragent');
+const rateLimit = require('express-rate-limit');
+
+// Enable detailed logging
+const debug = require('debug')('app:server');
+
+// Generate unique request ID
+const requestId = () => Math.random().toString(36).substring(7);
 
 // Enhanced logging middleware with request ID
 app.use((req, res, next) => {
-  req.requestId = Math.random().toString(36).substring(7);
-  console.log(`[${new Date().toISOString()}][${req.requestId}] ${req.method} ${req.url}`);
+  req.id = requestId();
+  console.log(`[${new Date().toISOString()}][${req.id}] ${req.method} ${req.url}`);
   next();
 });
 
@@ -21,43 +25,49 @@ app.use(express.json());
 app.use(useragent.express());
 app.set('trust proxy',1);
 
-// Add health check endpoint with enhanced logging
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100
+});
+app.use(limiter);
+
+// Health check endpoint
 app.get('/health', async (req, res) => {
-  const requestId = req.requestId;
-  console.log(`[${new Date().toISOString()}][${requestId}] Health Check: Starting health check...`);
-  try {
-    // Check MongoDB connection
-    const dbState = connectDatabase.mongoose?.connection?.readyState;
-    console.log(`[${new Date().toISOString()}][${requestId}] Health Check: Database state: ${dbState}`);
-    console.log(`[${new Date().toISOString()}][${requestId}] Health Check: DB_URI configured: ${!!process.env.DB_URI}`);
-    
-    if (dbState === 1) {
-      console.log(`[${new Date().toISOString()}][${requestId}] Health Check: Status: healthy`);
-      res.status(200).json({ 
-        status: 'healthy', 
-        database: 'connected',
-        timestamp: new Date().toISOString(),
-        requestId: requestId
-      });
-    } else {
-      console.log(`[${new Date().toISOString()}][${requestId}] Health Check: Status: unhealthy - Database disconnected`);
-      res.status(503).json({ 
-        status: 'unhealthy', 
-        database: 'disconnected',
-        dbState: dbState,
-        timestamp: new Date().toISOString(),
-        requestId: requestId
-      });
+    try {
+        const mongoose = connectDatabase.mongoose;
+        const dbState = mongoose.connection.readyState;
+        
+        console.log(`[${new Date().toISOString()}][${req.id}] Health check - DB State: ${dbState}`);
+        
+        const dbStatus = {
+            0: 'disconnected',
+            1: 'connected',
+            2: 'connecting',
+            3: 'disconnecting'
+        };
+
+        const health = {
+            status: dbState === 1 ? 'healthy' : 'unhealthy',
+            timestamp: new Date().toISOString(),
+            database: dbStatus[dbState] || 'unknown',
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            requestId: req.id
+        };
+
+        console.log(`[${new Date().toISOString()}][${req.id}] Health check response:`, health);
+        
+        res.status(dbState === 1 ? 200 : 503).json(health);
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}][${req.id}] Health check error:`, error);
+        res.status(503).json({
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: error.message,
+            requestId: req.id
+        });
     }
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}][${requestId}] Health Check Error:`, error);
-    res.status(503).json({ 
-      status: 'unhealthy', 
-      error: error.message,
-      timestamp: new Date().toISOString(),
-      requestId: requestId
-    });
-  }
 });
 
 // Connect to database with enhanced logging
@@ -85,21 +95,19 @@ app.use(cors({
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  const requestId = req.requestId;
-  console.error(`[${new Date().toISOString()}][${requestId}] Error:`, err);
+  console.error(`[${new Date().toISOString()}][${req.id}] Error:`, err);
   res.status(500).json({ 
-    error: 'Internal Server Error',
-    message: err.message,
-    timestamp: new Date().toISOString(),
-    requestId: requestId
+    status: 'error',
+    message: 'Internal server error',
+    requestId: req.id
   });
 });
 
 app.use('/', urlShortnerRouter);
 
-const server = app.listen(port, () => {
-  console.log(`[Startup] App listening on port ${port}`);
-  console.log(`[Startup] Base URL: ${base}`);
+const server = app.listen(process.env.PORT || 3200, () => {
+  console.log(`[Startup] App listening on port ${process.env.PORT || 3200}`);
+  console.log(`[Startup] Base URL: ${process.env.BASE || 'http://localhost:3200'}`);
   console.log(`[Startup] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[Startup] MongoDB URI: ${process.env.DB_URI ? '(configured)' : '(missing)'}`);
 });

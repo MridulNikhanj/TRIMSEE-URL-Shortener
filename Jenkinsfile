@@ -53,40 +53,68 @@ pipeline {
                 docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
                 
                 echo "Waiting for backend to be healthy..."
-                for i in $(seq 1 12); do
-                    echo "Backend health check attempt $i/12"
-                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-backend.*healthy"; then
+                for i in $(seq 1 15); do
+                    echo "Backend health check attempt $i/15"
+                    
+                    # Get container status
+                    CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' trimsee-backend)
+                    echo "Backend container status: $CONTAINER_STATUS"
+                    
+                    # Get health status
+                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' trimsee-backend)
+                    echo "Backend health status: $HEALTH_STATUS"
+                    
+                    if [ "$HEALTH_STATUS" = "healthy" ]; then
                         echo "Backend is healthy"
+                        echo "Backend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs backend
                         break
                     fi
-                    if [ $i -eq 12 ]; then
+                    
+                    if [ $i -eq 15 ]; then
                         echo "Backend failed to become healthy"
                         echo "Backend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs backend
                         echo "Backend Health Check Response:"
                         curl -v http://localhost:${BACKEND_PORT}/health || true
+                        echo "Container Inspection:"
+                        docker inspect trimsee-backend
                         exit 1
                     fi
-                    echo "Waiting for backend... (attempt $i/12)"
+                    
+                    echo "Waiting for backend... (attempt $i/15)"
                     docker-compose -f ${DOCKER_COMPOSE_FILE} logs --tail=50 backend
-                    sleep 10
+                    sleep 20
                 done
                 
                 echo "Waiting for frontend to be healthy..."
                 for i in $(seq 1 12); do
                     echo "Frontend health check attempt $i/12"
-                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-frontend.*healthy"; then
+                    
+                    # Get container status
+                    CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' trimsee-frontend)
+                    echo "Frontend container status: $CONTAINER_STATUS"
+                    
+                    # Get health status
+                    HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' trimsee-frontend)
+                    echo "Frontend health status: $HEALTH_STATUS"
+                    
+                    if [ "$HEALTH_STATUS" = "healthy" ]; then
                         echo "Frontend is healthy"
+                        echo "Frontend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs frontend
                         break
                     fi
+                    
                     if [ $i -eq 12 ]; then
                         echo "Frontend failed to become healthy"
                         echo "Frontend Logs:"
                         docker-compose -f ${DOCKER_COMPOSE_FILE} logs frontend
+                        echo "Container Inspection:"
+                        docker inspect trimsee-frontend
                         exit 1
                     fi
+                    
                     echo "Waiting for frontend... (attempt $i/12)"
                     docker-compose -f ${DOCKER_COMPOSE_FILE} logs --tail=50 frontend
                     sleep 10
@@ -124,6 +152,9 @@ pipeline {
             docker-compose -f ${DOCKER_COMPOSE_FILE} logs || true
             echo "Container status:"
             docker-compose -f ${DOCKER_COMPOSE_FILE} ps || true
+            echo "Container inspection:"
+            docker inspect trimsee-backend || true
+            docker inspect trimsee-frontend || true
             '''
         }
         always {
