@@ -16,9 +16,6 @@ services:
       - DEBUG=express:*,mongodb:*
       - NODE_OPTIONS=--trace-warnings
     working_dir: /app
-    volumes:
-      - ./server:/app
-      - /app/node_modules
     networks:
       - trimsee-network
     restart: unless-stopped
@@ -34,9 +31,6 @@ services:
       - PORT=3000
       - REACT_APP_BASE_URL=http://localhost:3200
     working_dir: /app
-    volumes:
-      - ./client:/app
-      - /app/node_modules
     depends_on:
       - backend
     networks:
