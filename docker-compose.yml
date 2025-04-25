@@ -22,12 +22,6 @@ services:
     networks:
       - trimsee-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "/healthcheck.sh"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 90s
 
   frontend:
     container_name: trimsee-frontend
@@ -44,17 +38,10 @@ services:
       - ./client:/app
       - /app/node_modules
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - trimsee-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || (echo 'Health check failed' && exit 1)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
 networks:
   trimsee-network:
