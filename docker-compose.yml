@@ -14,6 +14,7 @@ services:
       - BASE=http://localhost:3200
       - NODE_ENV=development
       - DEBUG=express:*,mongodb:*
+      - NODE_OPTIONS=--trace-warnings
     working_dir: /app
     volumes:
       - ./server:/app
@@ -22,8 +23,8 @@ services:
       - trimsee-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3200/health || (echo 'Health check failed' && exit 1)"]
-      interval: 20s
+      test: ["CMD-SHELL", "/healthcheck.sh"]
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
@@ -50,7 +51,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000 || (echo 'Health check failed' && exit 1)"]
-      interval: 20s
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
