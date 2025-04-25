@@ -11,6 +11,11 @@ services:
     networks:
       - trimsee-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   backend:
     container_name: trimsee-backend
@@ -19,10 +24,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3200:3200"
-    env_file:
-      - ./server/.env
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/trimsee
+      - PORT=3200
+      - DB_URI=${DB_URI:-mongodb://mongodb:27017/trimsee}
+      - BASE=http://localhost:3200
+      - NODE_ENV=development
     working_dir: /app
     volumes:
       - ./server:/app
@@ -30,8 +36,14 @@ services:
     networks:
       - trimsee-network
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3200/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   frontend:
     container_name: trimsee-frontend
@@ -40,17 +52,24 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    env_file:
-      - ./client/.env
+    environment:
+      - PORT=3000
+      - REACT_APP_BASE_URL=http://localhost:3200
     working_dir: /app
     volumes:
       - ./client:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - trimsee-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 networks:
   trimsee-network:

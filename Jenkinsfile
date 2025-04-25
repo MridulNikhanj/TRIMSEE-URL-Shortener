@@ -6,7 +6,8 @@ pipeline {
         FRONTEND_PORT = '3000'
         BACKEND_PORT = '3200'
         GITHUB_REPO = 'https://github.com/MridulNikhanj/TRIMSEE-URL-Shortener.git'
-        MONGODB_URI = 'mongodb://mongodb:27017/trimsee'
+        DB_URI = 'mongodb+srv://nikhanjmridul:XcRsInwe9rfoVAtm@cluster0.o59qiro.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
+        BASE = 'http://localhost:3200'
     }
     
     stages {
@@ -25,6 +26,7 @@ pipeline {
                 
                 echo "Cleaning up existing containers..."
                 docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans || true
+                docker system prune -f || true
                 '''
             }
         }
@@ -39,7 +41,8 @@ pipeline {
             steps {
                 sh '''
                 docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
-                sleep 20
+                echo "Waiting for containers to be healthy..."
+                sleep 60
                 echo "Checking container statuses..."
                 docker ps -a
                 '''
@@ -49,18 +52,39 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                echo "Waiting for services to be ready..."
-                sleep 30
-                
                 echo "Checking container health..."
-                docker ps | grep trimsee-frontend || (echo "Frontend container failed" && exit 1)
-                docker ps | grep trimsee-backend || (echo "Backend container failed" && exit 1)
-                docker ps | grep trimsee-mongodb || (echo "MongoDB container failed" && exit 1)
+                if ! docker ps | grep -q trimsee-mongodb; then
+                    echo "MongoDB container not running"
+                    docker logs trimsee-mongodb
+                    exit 1
+                fi
+                
+                if ! docker ps | grep -q trimsee-backend; then
+                    echo "Backend container not running"
+                    docker logs trimsee-backend
+                    exit 1
+                fi
+                
+                if ! docker ps | grep -q trimsee-frontend; then
+                    echo "Frontend container not running"
+                    docker logs trimsee-frontend
+                    exit 1
+                fi
                 
                 echo "Testing backend health..."
-                curl -X GET http://localhost:${BACKEND_PORT}/health || (echo "Backend health check failed" && exit 1)
-                
-                echo "All health checks passed!"
+                for i in $(seq 1 6); do
+                    if curl -s -f http://localhost:${BACKEND_PORT}/health; then
+                        echo "Backend is healthy"
+                        break
+                    fi
+                    if [ $i -eq 6 ]; then
+                        echo "Backend health check failed after 6 attempts"
+                        docker logs trimsee-backend
+                        exit 1
+                    fi
+                    echo "Waiting for backend to be ready... (attempt $i/6)"
+                    sleep 10
+                done
                 '''
             }
         }
