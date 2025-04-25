@@ -20,7 +20,7 @@ COPY . .
 
 # Configure Node.js for production with increased memory
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=8192 --max-semi-space-size=512 --optimize-for-size"
+ENV NODE_OPTIONS="--max-old-space-size=8192"
 
 # Build the application with increased memory allocation
 RUN npm run build

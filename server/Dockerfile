@@ -26,7 +26,7 @@ RUN echo "DB_URI=${DB_URI:-mongodb+srv://nikhanjmridul:XcRsInwe9rfoVAtm@cluster0
 
 # Configure Node.js for production with increased memory
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=8192 --max-semi-space-size=512 --optimize-for-size"
+ENV NODE_OPTIONS="--max-old-space-size=8192"
 
 # Install PM2 globally for better process management
 RUN npm install -g pm2
@@ -36,4 +36,4 @@ EXPOSE 3200
 HEALTHCHECK --interval=45s --timeout=30s --start-period=60s --retries=5 CMD /healthcheck.sh
 
 # Use PM2 to manage the Node.js process
-CMD ["pm2-runtime", "start", "index.js", "--node-args='--optimize-for-size'"]
+CMD ["pm2-runtime", "start", "index.js"]
