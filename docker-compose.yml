@@ -15,7 +15,8 @@ services:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   backend:
     container_name: trimsee-backend
@@ -43,7 +44,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3200/health"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
   frontend:
     container_name: trimsee-frontend
@@ -69,7 +71,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 40s
 
 networks:
   trimsee-network:

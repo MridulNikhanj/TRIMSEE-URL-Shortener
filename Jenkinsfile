@@ -33,58 +33,66 @@ pipeline {
         
         stage('Build Docker Images') {
             steps {
-                sh 'docker-compose -f ${DOCKER_COMPOSE_FILE} build --no-cache'
+                sh '''
+                echo "Building Docker images..."
+                docker-compose -f ${DOCKER_COMPOSE_FILE} build --no-cache
+                '''
             }
         }
         
         stage('Run Containers') {
             steps {
                 sh '''
+                echo "Starting containers..."
                 docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
-                echo "Waiting for containers to be healthy..."
-                sleep 60
-                echo "Checking container statuses..."
-                docker ps -a
-                '''
-            }
-        }
-        
-        stage('Health Check') {
-            steps {
-                sh '''
-                echo "Checking container health..."
-                if ! docker ps | grep -q trimsee-mongodb; then
-                    echo "MongoDB container not running"
-                    docker logs trimsee-mongodb
-                    exit 1
-                fi
                 
-                if ! docker ps | grep -q trimsee-backend; then
-                    echo "Backend container not running"
-                    docker logs trimsee-backend
-                    exit 1
-                fi
+                echo "Waiting for MongoDB to be healthy..."
+                for i in $(seq 1 12); do
+                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-mongodb.*healthy"; then
+                        echo "MongoDB is healthy"
+                        break
+                    fi
+                    if [ $i -eq 12 ]; then
+                        echo "MongoDB failed to become healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs mongodb
+                        exit 1
+                    fi
+                    echo "Waiting for MongoDB... (attempt $i/12)"
+                    sleep 10
+                done
                 
-                if ! docker ps | grep -q trimsee-frontend; then
-                    echo "Frontend container not running"
-                    docker logs trimsee-frontend
-                    exit 1
-                fi
-                
-                echo "Testing backend health..."
-                for i in $(seq 1 6); do
-                    if curl -s -f http://localhost:${BACKEND_PORT}/health; then
+                echo "Waiting for backend to be healthy..."
+                for i in $(seq 1 12); do
+                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-backend.*healthy"; then
                         echo "Backend is healthy"
                         break
                     fi
-                    if [ $i -eq 6 ]; then
-                        echo "Backend health check failed after 6 attempts"
-                        docker logs trimsee-backend
+                    if [ $i -eq 12 ]; then
+                        echo "Backend failed to become healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs backend
                         exit 1
                     fi
-                    echo "Waiting for backend to be ready... (attempt $i/6)"
+                    echo "Waiting for backend... (attempt $i/12)"
                     sleep 10
                 done
+                
+                echo "Waiting for frontend to be healthy..."
+                for i in $(seq 1 12); do
+                    if docker-compose -f ${DOCKER_COMPOSE_FILE} ps | grep -q "trimsee-frontend.*healthy"; then
+                        echo "Frontend is healthy"
+                        break
+                    fi
+                    if [ $i -eq 12 ]; then
+                        echo "Frontend failed to become healthy"
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} logs frontend
+                        exit 1
+                    fi
+                    echo "Waiting for frontend... (attempt $i/12)"
+                    sleep 10
+                done
+                
+                echo "All containers are healthy!"
+                docker-compose -f ${DOCKER_COMPOSE_FILE} ps
                 '''
             }
         }
@@ -112,9 +120,7 @@ pipeline {
             sh '''
             echo "Build or deployment failed!"
             echo "Container logs:"
-            docker logs trimsee-frontend || true
-            docker logs trimsee-backend || true
-            docker logs trimsee-mongodb || true
+            docker-compose -f ${DOCKER_COMPOSE_FILE} logs || true
             '''
         }
         always {
