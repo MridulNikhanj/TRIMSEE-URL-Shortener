@@ -25,8 +25,15 @@ pipeline {
                 docker-compose --version
                 
                 echo "Cleaning up existing containers..."
-                docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans || true
+                # Stop and remove all containers from previous runs
+                docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans --volumes || true
+                docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
+                
+                # Clean up any dangling resources
                 docker system prune -f || true
+                
+                # Remove any existing volumes
+                docker volume rm trimsee-pipeline_mongodb_data || true
                 '''
             }
         }
@@ -43,6 +50,9 @@ pipeline {
         stage('Run Containers') {
             steps {
                 sh '''
+                echo "Ensuring no conflicting containers exist..."
+                docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
+                
                 echo "Starting containers..."
                 docker-compose -f ${DOCKER_COMPOSE_FILE} up -d
                 
@@ -126,7 +136,9 @@ pipeline {
         always {
             sh '''
             echo "Cleaning up resources..."
-            docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans || true
+            docker-compose -f ${DOCKER_COMPOSE_FILE} down --remove-orphans --volumes || true
+            docker rm -f trimsee-mongodb trimsee-backend trimsee-frontend || true
+            docker volume rm trimsee-pipeline_mongodb_data || true
             '''
         }
     }
