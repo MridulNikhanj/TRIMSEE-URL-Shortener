@@ -25,10 +25,10 @@ ENV NODE_OPTIONS="--max-old-space-size=8192"
 # Build the application with increased memory allocation
 RUN npm run build
 
-# Install PM2 globally for better process management
-RUN npm install -g pm2 serve
+# Install http-server instead of serve
+RUN npm install -g http-server
 
 EXPOSE 3000
 
-# Use PM2 to manage the serve process
-CMD ["pm2-runtime", "start", "serve", "--", "-s", "build", "-l", "3000", "--no-clipboard", "--single"]
+# Use http-server directly instead of PM2
+CMD ["http-server", "build", "-p", "3000", "--proxy", "http://localhost:3000?"]

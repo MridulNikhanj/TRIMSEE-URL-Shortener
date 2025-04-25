@@ -32,11 +32,34 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Memory monitoring
+const monitorMemory = () => {
+  const used = process.memoryUsage();
+  const memoryUsage = {
+    rss: `${Math.round(used.rss / 1024 / 1024)} MB`,
+    heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)} MB`,
+    heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)} MB`,
+    external: `${Math.round(used.external / 1024 / 1024)} MB`,
+  };
+  console.log('Memory Usage:', memoryUsage);
+  
+  // Trigger garbage collection if heap usage is above 70%
+  if (used.heapUsed / used.heapTotal > 0.7 && global.gc) {
+    console.log('Triggering garbage collection...');
+    global.gc();
+  }
+};
+
+// Monitor memory every 5 minutes
+setInterval(monitorMemory, 5 * 60 * 1000);
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
     try {
         const mongoose = connectDatabase.mongoose;
         const dbState = mongoose.connection.readyState;
+        const memoryUsage = process.memoryUsage();
+        const heapUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal * 100).toFixed(2);
         
         console.log(`[${new Date().toISOString()}][${req.id}] Health check - DB State: ${dbState}`);
         
@@ -52,7 +75,11 @@ app.get('/health', async (req, res) => {
             timestamp: new Date().toISOString(),
             database: dbStatus[dbState] || 'unknown',
             uptime: process.uptime(),
-            memory: process.memoryUsage(),
+            memory: {
+                heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+                heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+                heapUsagePercent: `${heapUsagePercent}%`
+            },
             requestId: req.id
         };
 

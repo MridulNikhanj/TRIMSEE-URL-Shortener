@@ -19,21 +19,58 @@ RUN npm cache clean --force && \
 COPY . .
 
 # Create health check script with memory monitoring
-RUN echo '#!/bin/sh\nlog() {\n    echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1"\n}\n\n# Check memory usage\nMEM_USAGE=$(free -m | awk "/Mem:/ {print int((\$3/\$2)*100)}")\nlog "Memory usage: ${MEM_USAGE}%"\n\nNODE_PROCESS=$(ps aux | grep "node index.js" | grep -v grep)\nif [ -z "$NODE_PROCESS" ]; then\n    log "ERROR: Node.js process is not running"\n    log "Process list:"\n    ps aux\n    exit 1\nfi\n\nif ! netstat -tuln | grep ":3200" > /dev/null; then\n    log "ERROR: Port 3200 is not listening"\n    log "Network status:"\n    netstat -tuln\n    exit 1\nfi\n\nlog "Making health check request..."\nRESPONSE=$(curl -s -m 30 http://localhost:3200/health)\nSTATUS=$?\n\nif [ $STATUS -ne 0 ]; then\n    log "ERROR: Health check request failed with curl exit code: $STATUS"\n    log "Curl exit codes: 7=Failed to connect, 28=Timeout"\n    exit 1\nfi\n\nif ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then\n    log "ERROR: Invalid JSON response:"\n    log "$RESPONSE"\n    exit 1\nfi\n\nSTATUS=$(echo "$RESPONSE" | jq -r .status)\nDB_STATE=$(echo "$RESPONSE" | jq -r .database)\n\nlog "Health check response - Status: $STATUS, Database: $DB_STATE"\n\nif [ "$STATUS" = "healthy" ] && [ "$DB_STATE" = "connected" ]; then\n    log "Health check passed successfully"\n    exit 0\nelse\n    log "ERROR: Unhealthy status detected"\n    log "Full response: $RESPONSE"\n    exit 1\nfi' > /healthcheck.sh && chmod +x /healthcheck.sh
+RUN echo '#!/bin/bash\n\
+log_with_timestamp() {\n\
+    echo "$(date "+%Y-%m-%d %H:%M:%S") - $1"\n\
+}\n\
+\n\
+# Check if Node process is running\n\
+if ! pgrep -x "node" > /dev/null; then\n\
+    log_with_timestamp "ERROR: Node.js process is not running"\n\
+    exit 1\n\
+fi\n\
+\n\
+# Check if port is listening\n\
+if ! netstat -tuln | grep ":3200" > /dev/null; then\n\
+    log_with_timestamp "ERROR: Port 3200 is not listening"\n\
+    exit 1\n\
+fi\n\
+\n\
+# Make health check request\n\
+response=$(curl -s http://localhost:3200/health)\n\
+log_with_timestamp "Health check response: $response"\n\
+\n\
+# Check if response is valid JSON\n\
+if ! echo "$response" | jq . > /dev/null 2>&1; then\n\
+    log_with_timestamp "ERROR: Invalid JSON response from health check endpoint"\n\
+    exit 1\n\
+fi\n\
+\n\
+# Extract and check status\n\
+status=$(echo "$response" | jq -r .status)\n\
+db_state=$(echo "$response" | jq -r .dbState)\n\
+\n\
+log_with_timestamp "Health Status: $status, DB State: $db_state"\n\
+\n\
+if [ "$status" != "healthy" ]; then\n\
+    log_with_timestamp "ERROR: Unhealthy status detected"\n\
+    exit 1\n\
+fi\n\
+\n\
+exit 0' > /healthcheck.sh
+
+RUN chmod +x /healthcheck.sh
 
 # Set environment variables
 RUN echo "DB_URI=${DB_URI:-mongodb+srv://nikhanjmridul:XcRsInwe9rfoVAtm@cluster0.o59qiro.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0}\nBASE=${BASE:-http://localhost:3200}\nNODE_ENV=production\nDEBUG=express:*,mongodb:*" > .env
 
-# Configure Node.js for production with increased memory
+# Configure Node.js for production with optimized memory settings
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=8192"
-
-# Install PM2 globally for better process management
-RUN npm install -g pm2
+ENV NODE_OPTIONS="--max-old-space-size=2048 --expose-gc --gc-interval=100"
 
 EXPOSE 3200
 
-HEALTHCHECK --interval=45s --timeout=30s --start-period=60s --retries=5 CMD /healthcheck.sh
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 CMD /healthcheck.sh
 
-# Use PM2 to manage the Node.js process
-CMD ["pm2-runtime", "start", "index.js"]
+# Run node directly with garbage collection flags
+CMD ["node", "--expose-gc", "--gc-interval=100", "index.js"]
