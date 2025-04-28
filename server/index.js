@@ -27,8 +27,11 @@ app.set('trust proxy',1);
 
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per 15 minutes
+    message: "Too many requests from this IP, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false
 });
 app.use(limiter);
 
@@ -115,9 +118,10 @@ connectDatabase().catch(err => {
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://yourdomain.com' 
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  methods: ['GET', 'POST', 'DELETE'],
-  credentials: true
+    : '*', // Allow all origins in development
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Error handling middleware

@@ -9,8 +9,10 @@ const cache = new NodeCache({ stdTTL: 600 });
 // Rate limit middleware
 const limiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // limit each IP to 3 requests per hour
-  message: "Rate limit exceeded",
+  max: 50, // limit each IP to 50 requests per hour
+  message: "Rate limit exceeded. Please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 const generateUrl = async (req, res) => {
