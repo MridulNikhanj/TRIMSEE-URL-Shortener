@@ -2,7 +2,6 @@ FROM jenkins/jenkins:lts-jdk17
 
 USER root
 
-# Install Docker CLI and Docker Compose
 RUN apt-get update && \
     apt-get install -y \
     apt-transport-https \
@@ -19,7 +18,6 @@ RUN apt-get update && \
     curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose
 
-# Create docker group if it doesn't exist and add jenkins user to it
 RUN getent group docker || groupadd docker && \
     usermod -aG docker jenkins
 
