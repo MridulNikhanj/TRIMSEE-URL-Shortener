@@ -69,7 +69,7 @@ function App() {
     <div className="App flex flex-col items-center justify-center" style={{ backgroundColor: '#111827', minHeight: '100vh' }}>
       <div className='max-w-[1360px] mt-4'>
         <h1 className="mb-4 text-4xl font-extrabold leading-none tracking-tight text-white md:text-5xl lg:text-6xl dark:text-white animate-bounce">
-          <span class="text-blue-600 dark:text-blue-500 hover:scale-125">TRIM</span>SDF<span class="text-blue-600 dark:text-blue-500"></span>
+          <span class="text-blue-600 dark:text-blue-500 hover:scale-125">TRIM</span>SEE<span class="text-blue-600 dark:text-blue-500"></span>
         </h1>
       </div>
       <div className='flex'>
